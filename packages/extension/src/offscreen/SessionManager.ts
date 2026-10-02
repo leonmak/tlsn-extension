@@ -27,6 +27,7 @@ interface ChromeRuntimeLike {
   };
 }
 import { validateProvePermission, validateOpenWindowPermission } from './permissionValidator';
+import { commitmentOpenings } from './commitmentOpenings';
 
 /** Maximum number of preview characters shown per reveal range. */
 const PREVIEW_MAX_CHARS = 256;
@@ -365,6 +366,19 @@ export class SessionManager {
             logger.debug('reveal openings', openings);
           }
 
+          // Hand each hash commitment's opening back to the caller, so it can
+          // prove statements about the committed plaintext (e.g. in a ZK
+          // circuit) without revealing it. The plaintext stays on this device:
+          // it's returned to the plugin, never sent to the verifier.
+          const commitments = commit
+            ? await commitmentOpenings(
+                commit,
+                openings,
+                proveManager.getSentBytes(proverId),
+                proveManager.getRecvBytes(proverId),
+              )
+            : undefined;
+
           // Get structured response from verifier. In relay mode the result lives
           // on the verifying browser (its own verify() output) — there is no
           // server response to wait for, so the prover just completes.
@@ -375,7 +389,7 @@ export class SessionManager {
 
           emitBoth('COMPLETE', 1.0, 'Complete');
 
-          return response;
+          return commitments ? { ...response, commitments } : response;
         } finally {
           // Always clean up prover resources to prevent memory leaks
           await proveManager.cleanupProver(proverId);

@@ -893,6 +893,30 @@ console.log('Proof generated:', proof);
 }
 ```
 
+#### Hash commitment openings
+
+When any handler uses `HASH`, the verifier only receives a commitment
+`H(plaintext || blinder)` for that range. The `prove()` result also includes the
+**openings** of those commitments, so the plugin (or the page that ran it) can
+later prove statements about the committed plaintext, for example inside a
+zero-knowledge circuit, without revealing it and without rerunning MPC-TLS:
+
+```javascript
+const result = await prove(request, { verifierUrl, proxyUrl, handlers });
+// result.commitments: { sent: CommitmentOpening[], recv: CommitmentOpening[] }
+// CommitmentOpening (byte strings are hex):
+// { start, end, algorithm: 'SHA256' | 'BLAKE3' | 'KECCAK256',
+//   hash, blinder, plaintext }
+for (const o of result.commitments?.recv ?? []) {
+  // SHA-256: sha256(plaintext || blinder) === hash
+}
+```
+
+`commitments` is only present when the proof committed something. The plaintext
+and blinders stay on the device: they are returned to the plugin, never sent to
+the verifier. Treat them as secret: anyone holding an opening can show what the
+commitment hides.
+
 ---
 
 ### Progress Reporting
